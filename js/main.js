@@ -1444,10 +1444,9 @@ function closePdfViewer() {
     }
 }
 // ==========================================
-// MESIN IMMERSIVE FULLSCREEN (BISA DI-ZOOM)
+// MESIN IMMERSIVE FULLSCREEN (SUPER SEMPURNA)
 // ==========================================
 
-// Detektor event fullscreen (Mendeteksi saat operator klik Full atau Back HP)
 document.addEventListener('fullscreenchange', handleFullscreenUI);
 document.addEventListener('webkitfullscreenchange', handleFullscreenUI);
 
@@ -1464,20 +1463,26 @@ function handleFullscreenUI() {
         if (header) header.style.display = 'none';
         if (toolbar) toolbar.style.display = 'none';
         
+        // 1. HANCURKAN BANTALAN MODAL & SERAGAMKAN WARNA
+        modal.style.padding = '0px';
+        modal.style.paddingBottom = '0px';
+        modal.style.background = '#000'; // Hitam pekat seutuhnya
+        
         if (container) {
             container.style.padding = '0px';
             container.style.paddingBottom = '0px'; 
             container.style.gap = '0px';
-            container.style.background = '#000'; // Background hitam pekat
+            container.style.background = '#000'; 
         }
 
-        // ✅ PERBAIKAN: Jangan kunci maxWidth, dan gunakan scale dari cubitan!
         const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
         canvases.forEach(canvas => {
-            canvas.style.width = `${100 * visualScale}%`; // ✅ Ikuti level zoom jarimu
-            canvas.style.maxWidth = 'none';               // ✅ GEMBOK DIBUKA! Bebas membesar!
+            canvas.style.width = `${100 * visualScale}%`; 
+            canvas.style.maxWidth = 'none';               
             canvas.style.borderRadius = '0px'; 
-            canvas.style.marginBottom = '2px';
+            canvas.style.marginBottom = '0px';
+            // 2. Trik agar PDF selalu di tengah saat di-zoom
+            canvas.style.margin = '0 auto'; 
         });
 
         if (typeof showTemporaryToast === 'function') {
@@ -1489,6 +1494,11 @@ function handleFullscreenUI() {
         if (header) header.style.display = 'flex';
         if (toolbar) toolbar.style.display = 'flex';
         
+        // Kembalikan bantalan dan warna PWA asli
+        modal.style.padding = '';
+        modal.style.paddingBottom = '';
+        modal.style.background = '#020617';
+        
         if (container) {
             container.style.padding = '0px'; 
             container.style.paddingBottom = '50px'; 
@@ -1496,13 +1506,13 @@ function handleFullscreenUI() {
             container.style.background = '#020617';
         }
 
-        // Kembalikan ukuran dokumen ke default zoom saat ini
         const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
         canvases.forEach(canvas => {
             canvas.style.width = `${100 * visualScale}%`;
             canvas.style.maxWidth = 'none';
             canvas.style.borderRadius = '4px';
             canvas.style.marginBottom = '20px';
+            canvas.style.margin = '0'; // Kembalikan ke normal
         });
     }
 }
