@@ -1221,13 +1221,13 @@ function renderDocuments(docs) {
 }
 
 // ============================================
-// NATIVE PDF RENDERER (ULTIMATE ZOOM & PINCH)
+// NATIVE PDF RENDERER (ULTIMATE ZOOM + BLOB DOWNLOAD)
 // ============================================
 
 let activePdfDoc = null;
 let visualScale = 1.0; 
 let currentRotation = 0;
-// 👇 TAMBAHKAN DUA VARIABEL MEMORI INI 👇
+let isPinchSensorAttached = false; 
 let activePdfUrl = ""; 
 let activePdfName = "";
 
@@ -1238,19 +1238,24 @@ async function showPdfInApp(url, name) {
 
     if (!modal || !container) return;
 
-    // 👇 SIMPAN URL DAN NAMA KE DALAM MEMORI 👇
+    // 1. Simpan URL ke memori untuk Download
     activePdfUrl = encodeURI(url);
     activePdfName = name.replace('.pdf', '').replace('.PDF', '');
-    
+
+    // 2. Pasang Sensor Cubit Jari (Hanya dipasang 1x agar tidak error)
+    if (!isPinchSensorAttached) {
+        attachPinchSensor(container);
+        isPinchSensorAttached = true;
+    }
+
     visualScale = 1.0; 
     currentRotation = 0;
     activePdfDoc = null;
 
-    title.textContent = name.replace('.pdf', '').replace('.PDF', '');
+    title.textContent = activePdfName;
     
-    // Pastikan container bisa di-scroll sangat mulus khas HP
     container.style.overflow = 'auto'; 
-    container.style.WebkitOverflowScrolling = 'touch'; // Sensitivitas geser maksimal di iOS/Android
+    container.style.WebkitOverflowScrolling = 'touch'; 
     
     container.innerHTML = `
         <div class="job-loading" style="margin-top: 50px;">
@@ -1262,8 +1267,7 @@ async function showPdfInApp(url, name) {
     setTimeout(() => modal.classList.add('active'), 10);
 
     try {
-        const cleanUrl = encodeURI(url);
-        const loadingTask = pdfjsLib.getDocument(cleanUrl);
+        const loadingTask = pdfjsLib.getDocument(activePdfUrl);
         activePdfDoc = await loadingTask.promise;
         
         await renderAllPdfPages(); 
@@ -1282,24 +1286,19 @@ async function renderAllPdfPages() {
 
     for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
         const page = await activePdfDoc.getPage(pageNum);
-        
-        // Render dengan ketajaman super tinggi (Scale 2.0)
-        const viewport = page.getViewport({ scale: 2.0, rotation: currentRotation });
+        const viewport = page.getViewport({ scale: 2.0, rotation: currentRotation }); // Kualitas HD
         
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         
-        // Atur gaya kertas default
         canvas.style.width = `${100 * visualScale}%`;
         canvas.style.maxWidth = 'none'; 
         canvas.style.background = '#fff';
         canvas.style.borderRadius = '4px';
         canvas.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
         canvas.style.marginBottom = '20px';
-        
-        // Set animasi HANYA untuk tombol zoom, bukan untuk cubitan
         canvas.style.transition = 'width 0.2s ease-out'; 
         
         container.appendChild(canvas);
@@ -1315,7 +1314,6 @@ function attachPinchSensor(container) {
     let initialPinchScale = 1.0;
 
     container.addEventListener('touchstart', (e) => {
-        // Jika pakai 2 jari, mulai hitung jarak jarinya
         if (e.touches.length === 2) {
             touchStartDist = Math.hypot(
                 e.touches[0].pageX - e.touches[1].pageX,
@@ -1323,7 +1321,6 @@ function attachPinchSensor(container) {
             );
             initialPinchScale = visualScale;
             
-            // Matikan transisi agar zoom menempel di jari (Sangat Sensitif)
             const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
             canvases.forEach(canvas => canvas.style.transition = 'none');
         }
@@ -1331,21 +1328,18 @@ function attachPinchSensor(container) {
 
     container.addEventListener('touchmove', (e) => {
         if (e.touches.length === 2) {
-            e.preventDefault(); // Cegah layar utama ikut membesar/refresh
+            e.preventDefault(); // Matikan fitur refresh / scroll bawaan layar HP
             const currentDist = Math.hypot(
                 e.touches[0].pageX - e.touches[1].pageX,
                 e.touches[0].pageY - e.touches[1].pageY
             );
             
-            // Hitung sensitivitas perbesaran (Scale Factor)
             const scaleFactor = currentDist / touchStartDist;
             visualScale = initialPinchScale * scaleFactor;
             
-            // Batasan Zoom Dokumen
             if (visualScale < 0.5) visualScale = 0.5;
             if (visualScale > 5.0) visualScale = 5.0;
             
-            // Terapkan langsung ke kanvas
             const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
             canvases.forEach(canvas => {
                 canvas.style.width = `${100 * visualScale}%`;
@@ -1355,7 +1349,6 @@ function attachPinchSensor(container) {
 
     container.addEventListener('touchend', (e) => {
         if (e.touches.length < 2) {
-            // Kembalikan animasi jika jari dilepas (untuk tombol zoom manual)
             const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
             canvases.forEach(canvas => canvas.style.transition = 'width 0.2s ease-out');
         }
@@ -1378,7 +1371,7 @@ function zoomPdf(step) {
 function rotatePdf() {
     if (!activePdfDoc) return;
     currentRotation = (currentRotation + 90) % 360;
-    renderAllPdfPages(); // Rotasi butuh digambar ulang
+    renderAllPdfPages(); 
 }
 
 function fullscreenPdf() {
@@ -1390,31 +1383,47 @@ function fullscreenPdf() {
         if (document.exitFullscreen) document.exitFullscreen();
     }
 }
+
 // ==========================================
-// MESIN UNDUH DOKUMEN (DOWNLOADER)
+// MESIN UNDUH DOKUMEN (BLOB DOWNLOADER - KHUSUS PWA)
 // ==========================================
-function downloadActivePdf() {
+async function downloadActivePdf() {
     if (!activePdfUrl) {
-        if (typeof showCustomAlert === 'function') {
-            showCustomAlert('File PDF belum siap diunduh.', 'error');
-        }
+        if (typeof showCustomAlert === 'function') showCustomAlert('Dokumen belum siap.', 'error');
         return;
     }
 
     if (typeof showTemporaryToast === 'function') {
-        showTemporaryToast('⏳ Sedang mengunduh dokumen...', 'info', 3000);
+        showTemporaryToast('⏳ Menyedot dokumen ke memori HP...', 'info', 3000);
     }
 
-    // Cara paling aman memaksa browser mengunduh file
-    const link = document.createElement('a');
-    link.href = activePdfUrl;
-    link.target = '_blank'; // Buka tab baru di belakang layar agar download terpicu
-    // Paksa memberikan nama file yang rapi
-    link.download = `${activePdfName}_SOP_Pabrik_3B.pdf`; 
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+        // 1. Sedot Data Mentahnya (Blob)
+        const response = await fetch(activePdfUrl);
+        if (!response.ok) throw new Error("Gagal mengambil file dari server");
+        const blob = await response.blob();
+        
+        // 2. Buat Link Download Lokal (Ini akan tembus blokiran PWA)
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `${activePdfName.replace(/ /g, '_')}_SOP_3B.pdf`; // Nama rapi dengan underscore
+        
+        // 3. Paksa Klik & Unduh
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 4. Bersihkan Memori HP
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        
+        if (typeof showTemporaryToast === 'function') {
+            showTemporaryToast('✅ Berhasil diunduh! Cek folder Download HP.', 'success', 3000);
+        }
+    } catch (error) {
+        console.error("Gagal Download:", error);
+        if (typeof showCustomAlert === 'function') showCustomAlert('Gagal Mengunduh. Pastikan sinyal kuat.', 'error');
+    }
 }
 
 function closePdfViewer() {
