@@ -1444,47 +1444,68 @@ function closePdfViewer() {
     }
 }
 // ==========================================
-// MESIN IMMERSIVE FULLSCREEN (PEMBERSIH LAYAR)
+// MESIN IMMERSIVE FULLSCREEN (SUPER SMOOTH)
 // ==========================================
 
-// Deteksi saat layar berubah jadi Fullscreen atau keluar
+// Detektor event fullscreen (Mendeteksi saat operator klik Full atau Back HP)
 document.addEventListener('fullscreenchange', handleFullscreenUI);
 document.addEventListener('webkitfullscreenchange', handleFullscreenUI);
 
 function handleFullscreenUI() {
     const modal = document.getElementById('pdfViewerModal');
+    if (!modal) return;
+    
     const header = modal.querySelector('.screen-header');
     const toolbar = modal.querySelector('.pdf-toolbar');
     const container = document.getElementById('pdfCanvasContainer');
 
     if (document.fullscreenElement || document.webkitFullscreenElement) {
-        // SEDANG MODE SATU LAYAR PENUH
-        header.style.display = 'none';
-        toolbar.style.display = 'none';
-        container.style.marginTop = '0'; // Buang margin agar mentok ke atas
-        container.style.padding = '0';   // Buang padding agar mentok ke samping
+        // --- MODE LAYAR PENUH (IMMERSIVE) ---
+        // Sembunyikan Header dan Toolbar
+        if (header) header.style.display = 'none';
+        if (toolbar) toolbar.style.display = 'none';
         
-        if (typeof showTemporaryToast === 'function') {
-            showTemporaryToast('Mode Imersif: Ketuk tombol Back HP untuk keluar.', 'info', 3000);
+        // Hapus SEMUA padding dan celah dari container agar PDF menyentuh pinggir layar
+        if (container) {
+            container.style.padding = '0px';
+            container.style.paddingBottom = '0px'; 
+            container.style.gap = '0px';
+            container.style.background = '#000'; // Background hitam pekat agar fokus
         }
-    } else {
-        // KEMBALI KE TAMPILAN NORMAL
-        header.style.display = 'flex';
-        toolbar.style.display = 'flex';
-        container.style.marginTop = '0'; 
-        container.style.padding = '16px';
-    }
-}
 
-// Perbarui fungsi Fullscreen lama kamu
-function fullscreenPdf() {
-    const modal = document.getElementById('pdfViewerModal');
-    // Minta Fullscreen untuk seluruh kotak modal
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (modal.requestFullscreen) modal.requestFullscreen();
-        else if (modal.webkitRequestFullscreen) modal.webkitRequestFullscreen();
+        // Paksa lebar dokumen jadi 100% pas layar
+        const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
+        canvases.forEach(canvas => {
+            canvas.style.width = '100%'; 
+            canvas.style.maxWidth = '100vw'; // Mentok layar
+            canvas.style.borderRadius = '0px'; // Buang border melengkung
+            canvas.style.marginBottom = '2px';
+        });
+
+        // Tampilkan pesan 1 kali saja
+        if (typeof showTemporaryToast === 'function') {
+            showTemporaryToast('Tekan tombol Back pada HP untuk keluar.', 'info', 2000);
+        }
+
     } else {
-        if (document.exitFullscreen) document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        // --- KEMBALI KE TAMPILAN NORMAL ---
+        if (header) header.style.display = 'flex';
+        if (toolbar) toolbar.style.display = 'flex';
+        
+        if (container) {
+            container.style.padding = '0px'; // Kembali normal
+            container.style.paddingBottom = '50px'; 
+            container.style.gap = '10px';
+            container.style.background = '#020617';
+        }
+
+        // Kembalikan ukuran dokumen ke default zoom saat ini
+        const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
+        canvases.forEach(canvas => {
+            canvas.style.width = `${100 * visualScale}%`;
+            canvas.style.maxWidth = 'none';
+            canvas.style.borderRadius = '4px';
+            canvas.style.marginBottom = '20px';
+        });
     }
 }
