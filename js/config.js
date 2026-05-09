@@ -7,8 +7,8 @@
    ============================================ */
 
 // 1. APP CONFIGURATION
-const APP_VERSION = '3.0.5';
-const APP_NAME = 'PROJECT LOGSHEET';
+const APP_VERSION = '3.0.6';
+const APP_NAME = 'PROJECT LANJUTAN';
 
 const AUTH_CONFIG = {
     SESSION_KEY: 'turbine_session',
