@@ -159,32 +159,38 @@ function simulateLoading() {
     let progress = 0;
     
     const increment = () => {
-        const randomJump = Math.random() * 15 + 5;
+        // 1. PERCEPAT LONCATAN ANGKA: Sekali loncat langsung nambah 25% - 40%
+        const randomJump = Math.random() * 15 + 25; 
         progress += randomJump;
         
         if (progress >= 100) {
             progress = 100;
             updateLoaderProgress(Math.floor(progress));
+            
+            // 2. PERCEPAT JEDA SEBELUM FADE OUT: Dari 800ms menjadi hanya 100ms
             setTimeout(() => {
                 hideLoader();
-            }, 800);
+            }, 100); 
         } else {
             updateLoaderProgress(Math.floor(progress));
-            setTimeout(increment, 400 + Math.random() * 400);
+            
+            // 3. PERCEPAT JEDA ANTAR ANGKA: Dari 400-800ms menjadi hanya 30-80ms!
+            setTimeout(increment, 30 + Math.random() * 50); 
         }
     };
     
-    // Start after text animation completes (approx 1s)
-    setTimeout(increment, 1200);
+    // 4. PERCEPAT MULAINYA ANIMASI: Tidak perlu menunggu tulisan selesai, 100ms langsung jalan!
+    setTimeout(increment, 100);
 }
 
 function hideLoader() {
     const loader = document.getElementById('loader');
     if (loader) {
         loader.classList.add('hidden');
+        // Tutup layar seutuhnya setelah efek memudar selesai
         setTimeout(() => {
             loader.style.display = 'none';
-        }, 600);
+        }, 300); // Saya persingkat dari 600ms jadi 300ms agar lebih sigap
     }
 }
 
@@ -1215,13 +1221,15 @@ function renderDocuments(docs) {
 }
 
 // ============================================
-// NATIVE PDF RENDERER (ULTIMATE SENSOR CUBIT)
+// NATIVE PDF RENDERER (ULTIMATE ZOOM & PINCH)
 // ============================================
 
 let activePdfDoc = null;
 let visualScale = 1.0; 
 let currentRotation = 0;
-let isPinchSensorAttached = false; // Mencegah sensor dobel
+// 👇 TAMBAHKAN DUA VARIABEL MEMORI INI 👇
+let activePdfUrl = ""; 
+let activePdfName = "";
 
 async function showPdfInApp(url, name) {
     const modal = document.getElementById('pdfViewerModal');
@@ -1230,12 +1238,10 @@ async function showPdfInApp(url, name) {
 
     if (!modal || !container) return;
 
-    // Pasang Sensor Cubit Khusus Dokumen (Hanya dieksekusi 1x)
-    if (!isPinchSensorAttached) {
-        attachPinchSensor(container);
-        isPinchSensorAttached = true;
-    }
-
+    // 👇 SIMPAN URL DAN NAMA KE DALAM MEMORI 👇
+    activePdfUrl = encodeURI(url);
+    activePdfName = name.replace('.pdf', '').replace('.PDF', '');
+    
     visualScale = 1.0; 
     currentRotation = 0;
     activePdfDoc = null;
@@ -1383,6 +1389,32 @@ function fullscreenPdf() {
     } else {
         if (document.exitFullscreen) document.exitFullscreen();
     }
+}
+// ==========================================
+// MESIN UNDUH DOKUMEN (DOWNLOADER)
+// ==========================================
+function downloadActivePdf() {
+    if (!activePdfUrl) {
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert('File PDF belum siap diunduh.', 'error');
+        }
+        return;
+    }
+
+    if (typeof showTemporaryToast === 'function') {
+        showTemporaryToast('⏳ Sedang mengunduh dokumen...', 'info', 3000);
+    }
+
+    // Cara paling aman memaksa browser mengunduh file
+    const link = document.createElement('a');
+    link.href = activePdfUrl;
+    link.target = '_blank'; // Buka tab baru di belakang layar agar download terpicu
+    // Paksa memberikan nama file yang rapi
+    link.download = `${activePdfName}_SOP_Pabrik_3B.pdf`; 
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function closePdfViewer() {
