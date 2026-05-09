@@ -1215,12 +1215,13 @@ function renderDocuments(docs) {
 }
 
 // ============================================
-// NATIVE PDF RENDERER (ULTIMATE ZOOM & PINCH)
+// NATIVE PDF RENDERER (ULTIMATE SENSOR CUBIT)
 // ============================================
 
 let activePdfDoc = null;
-let visualScale = 1.0; // Mengontrol ukuran CSS (Lebih cepat tanpa loading ulang)
+let visualScale = 1.0; 
 let currentRotation = 0;
+let isPinchSensorAttached = false; // Mencegah sensor dobel
 
 async function showPdfInApp(url, name) {
     const modal = document.getElementById('pdfViewerModal');
@@ -1229,12 +1230,11 @@ async function showPdfInApp(url, name) {
 
     if (!modal || !container) return;
 
-    // 👇 1. TRIK SULAP: BUKA KUNCI PINCH-TO-ZOOM HP 👇
-    const metaViewport = document.querySelector('meta[name="viewport"]');
-    if (metaViewport) {
-        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
+    // Pasang Sensor Cubit Khusus Dokumen (Hanya dieksekusi 1x)
+    if (!isPinchSensorAttached) {
+        attachPinchSensor(container);
+        isPinchSensorAttached = true;
     }
-    // 👆 ========================================= 👆
 
     visualScale = 1.0; 
     currentRotation = 0;
@@ -1242,8 +1242,9 @@ async function showPdfInApp(url, name) {
 
     title.textContent = name.replace('.pdf', '').replace('.PDF', '');
     
-    // Pastikan container bisa di-scroll ke kanan-kiri saat di-zoom
+    // Pastikan container bisa di-scroll sangat mulus khas HP
     container.style.overflow = 'auto'; 
+    container.style.WebkitOverflowScrolling = 'touch'; // Sensitivitas geser maksimal di iOS/Android
     
     container.innerHTML = `
         <div class="job-loading" style="margin-top: 50px;">
@@ -1276,7 +1277,7 @@ async function renderAllPdfPages() {
     for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
         const page = await activePdfDoc.getPage(pageNum);
         
-        // Render dengan ketajaman super tinggi (Scale 2.0) agar tidak pecah saat di-zoom jari
+        // Render dengan ketajaman super tinggi (Scale 2.0)
         const viewport = page.getViewport({ scale: 2.0, rotation: currentRotation });
         
         const canvas = document.createElement('canvas');
@@ -1284,40 +1285,94 @@ async function renderAllPdfPages() {
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         
-        // Atur gaya ukuran visual (Dimulai dari 100%)
+        // Atur gaya kertas default
         canvas.style.width = `${100 * visualScale}%`;
-        canvas.style.maxWidth = 'none'; // Hapus batasan agar bisa bebas membesar
-        canvas.style.transition = 'width 0.2s ease-out'; // Animasi mulus saat tombol zoom ditekan
+        canvas.style.maxWidth = 'none'; 
         canvas.style.background = '#fff';
         canvas.style.borderRadius = '4px';
         canvas.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
         canvas.style.marginBottom = '20px';
+        
+        // Set animasi HANYA untuk tombol zoom, bukan untuk cubitan
+        canvas.style.transition = 'width 0.2s ease-out'; 
         
         container.appendChild(canvas);
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
     }
 }
 
-// MESIN ZOOM SUPER CEPAT (Menggunakan CSS, bukan render ulang)
+// ==========================================
+// MESIN SENSOR CUBIT JARI (PINCH-TO-ZOOM)
+// ==========================================
+function attachPinchSensor(container) {
+    let touchStartDist = 0;
+    let initialPinchScale = 1.0;
+
+    container.addEventListener('touchstart', (e) => {
+        // Jika pakai 2 jari, mulai hitung jarak jarinya
+        if (e.touches.length === 2) {
+            touchStartDist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            initialPinchScale = visualScale;
+            
+            // Matikan transisi agar zoom menempel di jari (Sangat Sensitif)
+            const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
+            canvases.forEach(canvas => canvas.style.transition = 'none');
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault(); // Cegah layar utama ikut membesar/refresh
+            const currentDist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            
+            // Hitung sensitivitas perbesaran (Scale Factor)
+            const scaleFactor = currentDist / touchStartDist;
+            visualScale = initialPinchScale * scaleFactor;
+            
+            // Batasan Zoom Dokumen
+            if (visualScale < 0.5) visualScale = 0.5;
+            if (visualScale > 5.0) visualScale = 5.0;
+            
+            // Terapkan langsung ke kanvas
+            const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
+            canvases.forEach(canvas => {
+                canvas.style.width = `${100 * visualScale}%`;
+            });
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            // Kembalikan animasi jika jari dilepas (untuk tombol zoom manual)
+            const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
+            canvases.forEach(canvas => canvas.style.transition = 'width 0.2s ease-out');
+        }
+    });
+}
+
+// ==========================================
+// TOMBOL KONTROL MANUAL
+// ==========================================
 function zoomPdf(step) {
     if (!activePdfDoc) return;
-    
     visualScale += step;
     if (visualScale < 0.5) visualScale = 0.5;
-    if (visualScale > 4.0) visualScale = 4.0;
+    if (visualScale > 5.0) visualScale = 5.0;
     
-    // Ubah ukuran seluruh halaman serentak secara instan
     const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
-    canvases.forEach(canvas => {
-        canvas.style.width = `${100 * visualScale}%`;
-    });
+    canvases.forEach(canvas => canvas.style.width = `${100 * visualScale}%`);
 }
 
 function rotatePdf() {
     if (!activePdfDoc) return;
     currentRotation = (currentRotation + 90) % 360;
-    // Rotasi butuh render ulang kanvasnya
-    renderAllPdfPages();
+    renderAllPdfPages(); // Rotasi butuh digambar ulang
 }
 
 function fullscreenPdf() {
@@ -1333,13 +1388,6 @@ function fullscreenPdf() {
 function closePdfViewer() {
     const modal = document.getElementById('pdfViewerModal');
     const container = document.getElementById('pdfCanvasContainer');
-
-    // 👇 2. TRIK SULAP: KUNCI KEMBALI LAYAR HP 👇
-    const metaViewport = document.querySelector('meta[name="viewport"]');
-    if (metaViewport) {
-        metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-    }
-    // 👆 ========================================= 👆
 
     if (modal) {
         modal.classList.remove('active');
