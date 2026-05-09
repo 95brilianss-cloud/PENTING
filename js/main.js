@@ -1444,7 +1444,7 @@ function closePdfViewer() {
     }
 }
 // ==========================================
-// MESIN IMMERSIVE FULLSCREEN (SUPER SMOOTH)
+// MESIN IMMERSIVE FULLSCREEN (BISA DI-ZOOM)
 // ==========================================
 
 // Detektor event fullscreen (Mendeteksi saat operator klik Full atau Back HP)
@@ -1461,30 +1461,27 @@ function handleFullscreenUI() {
 
     if (document.fullscreenElement || document.webkitFullscreenElement) {
         // --- MODE LAYAR PENUH (IMMERSIVE) ---
-        // Sembunyikan Header dan Toolbar
         if (header) header.style.display = 'none';
         if (toolbar) toolbar.style.display = 'none';
         
-        // Hapus SEMUA padding dan celah dari container agar PDF menyentuh pinggir layar
         if (container) {
             container.style.padding = '0px';
             container.style.paddingBottom = '0px'; 
             container.style.gap = '0px';
-            container.style.background = '#000'; // Background hitam pekat agar fokus
+            container.style.background = '#000'; // Background hitam pekat
         }
 
-        // Paksa lebar dokumen jadi 100% pas layar
+        // ✅ PERBAIKAN: Jangan kunci maxWidth, dan gunakan scale dari cubitan!
         const canvases = document.querySelectorAll('#pdfCanvasContainer canvas');
         canvases.forEach(canvas => {
-            canvas.style.width = '100%'; 
-            canvas.style.maxWidth = '100vw'; // Mentok layar
-            canvas.style.borderRadius = '0px'; // Buang border melengkung
+            canvas.style.width = `${100 * visualScale}%`; // ✅ Ikuti level zoom jarimu
+            canvas.style.maxWidth = 'none';               // ✅ GEMBOK DIBUKA! Bebas membesar!
+            canvas.style.borderRadius = '0px'; 
             canvas.style.marginBottom = '2px';
         });
 
-        // Tampilkan pesan 1 kali saja
         if (typeof showTemporaryToast === 'function') {
-            showTemporaryToast('Tekan tombol Back pada HP untuk keluar.', 'info', 2000);
+            showTemporaryToast('Mode Imersif: Cubit layar untuk Zoom.', 'info', 2500);
         }
 
     } else {
@@ -1493,7 +1490,7 @@ function handleFullscreenUI() {
         if (toolbar) toolbar.style.display = 'flex';
         
         if (container) {
-            container.style.padding = '0px'; // Kembali normal
+            container.style.padding = '0px'; 
             container.style.paddingBottom = '50px'; 
             container.style.gap = '10px';
             container.style.background = '#020617';
