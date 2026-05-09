@@ -1443,3 +1443,48 @@ function closePdfViewer() {
         }, 300);
     }
 }
+// ==========================================
+// MESIN IMMERSIVE FULLSCREEN (PEMBERSIH LAYAR)
+// ==========================================
+
+// Deteksi saat layar berubah jadi Fullscreen atau keluar
+document.addEventListener('fullscreenchange', handleFullscreenUI);
+document.addEventListener('webkitfullscreenchange', handleFullscreenUI);
+
+function handleFullscreenUI() {
+    const modal = document.getElementById('pdfViewerModal');
+    const header = modal.querySelector('.screen-header');
+    const toolbar = modal.querySelector('.pdf-toolbar');
+    const container = document.getElementById('pdfCanvasContainer');
+
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+        // SEDANG MODE SATU LAYAR PENUH
+        header.style.display = 'none';
+        toolbar.style.display = 'none';
+        container.style.marginTop = '0'; // Buang margin agar mentok ke atas
+        container.style.padding = '0';   // Buang padding agar mentok ke samping
+        
+        if (typeof showTemporaryToast === 'function') {
+            showTemporaryToast('Mode Imersif: Ketuk tombol Back HP untuk keluar.', 'info', 3000);
+        }
+    } else {
+        // KEMBALI KE TAMPILAN NORMAL
+        header.style.display = 'flex';
+        toolbar.style.display = 'flex';
+        container.style.marginTop = '0'; 
+        container.style.padding = '16px';
+    }
+}
+
+// Perbarui fungsi Fullscreen lama kamu
+function fullscreenPdf() {
+    const modal = document.getElementById('pdfViewerModal');
+    // Minta Fullscreen untuk seluruh kotak modal
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (modal.requestFullscreen) modal.requestFullscreen();
+        else if (modal.webkitRequestFullscreen) modal.webkitRequestFullscreen();
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+}
