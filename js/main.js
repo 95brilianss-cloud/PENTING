@@ -1132,6 +1132,7 @@ function formatTime(date) {
 }
 // ============================================
 // MESIN DOKUMEN SOP/PID (SEARCH, FILTER & IN-APP VIEWER)
+// DENGAN SMART CACHE ENGINE
 // ============================================
 
 let globalDocuments = []; // Brankas penyimpan data PDF
@@ -1143,20 +1144,15 @@ async function openDocumentMenu() {
     const categorySelect = document.getElementById('docCategory');
     if (!container) return;
 
-    container.innerHTML = '<div class="job-loading"><div class="spinner"></div><p>Sinkronisasi Katalog SOP...</p></div>';
+    // 1. CEK BRANKAS MEMORI LOKAL (CACHE) TERLEBIH DAHULU
+    const cachedKatalog = localStorage.getItem('sop_katalog_cache');
 
-    try {
-        const response = await fetch(`${GAS_URL}?action=getSopList`);
-        const res = await response.json();
-
-        if (res.success && res.data) {
-            globalDocuments = res.data.map(doc => ({
-                name: doc.nama,
-                category: doc.area,
-                url: `${SUPABASE_BASE_URL}/${doc.file}` // Merakit URL Supabase secara otomatis
-            }));
-
-            // Membuat kategori filter secara unik
+    if (cachedKatalog) {
+        try {
+            // JIKA ADA INGATAN: Tampilkan seketika tanpa jeda loading!
+            globalDocuments = JSON.parse(cachedKatalog);
+            
+            // Susun ulang dropdown filter kategori
             const uniqueCategories = [...new Set(globalDocuments.map(d => d.category))];
             categorySelect.innerHTML = '<option value="ALL">Semua Area</option>';
             uniqueCategories.forEach(cat => {
@@ -1167,9 +1163,60 @@ async function openDocumentMenu() {
             });
 
             renderDocuments(globalDocuments);
+
+            // Indikator halus bahwa aplikasi sedang mengecek update di latar belakang
+            if (typeof showTemporaryToast === 'function') {
+                showTemporaryToast('🔄 Memeriksa pembaruan dokumen...', 'info', 1500);
+            }
+        } catch (e) {
+            console.warn("Gagal membaca cache SOP, mengambil ulang dari server...", e);
+            container.innerHTML = '<div class="job-loading"><div class="spinner"></div><p>Sinkronisasi Katalog SOP...</p></div>';
+        }
+    } else {
+        // JIKA CACHE KOSONG (Pertama kali buka): Tampilkan loading normal
+        container.innerHTML = '<div class="job-loading"><div class="spinner"></div><p>Menarik Katalog SOP Pertama Kali...</p></div>';
+    }
+
+    // 2. AMBIL DATA TERBARU DARI GOOGLE SCRIPT (Berjalan siluman di latar belakang)
+    try {
+        const response = await fetch(`${GAS_URL}?action=getSopList`);
+        const res = await response.json();
+
+        if (res.success && res.data) {
+            const freshDocuments = res.data.map(doc => ({
+                name: doc.nama,
+                category: doc.area,
+                url: `${SUPABASE_BASE_URL}/${doc.file}` 
+            }));
+
+            // 3. BANDINGKAN: Jika ada dokumen baru, langsung perbarui layar & simpan ke brankas
+            if (!cachedKatalog || JSON.stringify(globalDocuments) !== JSON.stringify(freshDocuments)) {
+                globalDocuments = freshDocuments;
+                localStorage.setItem('sop_katalog_cache', JSON.stringify(globalDocuments)); // Simpan permanen
+                
+                // Update dropdown kategori
+                const uniqueCategories = [...new Set(globalDocuments.map(d => d.category))];
+                categorySelect.innerHTML = '<option value="ALL">Semua Area</option>';
+                uniqueCategories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = `📁 ${cat}`;
+                    categorySelect.appendChild(opt);
+                });
+
+                renderDocuments(globalDocuments);
+                
+                if (cachedKatalog && typeof showTemporaryToast === 'function') {
+                    showTemporaryToast('✅ Katalog dokumen berhasil diperbarui!', 'success', 2000);
+                }
+            }
         }
     } catch (error) {
-        container.innerHTML = '<div class="job-empty">Gagal memuat katalog dari Cloud.</div>';
+        console.error("Gagal sinkron dokumen dari cloud:", error);
+        // Jika memori cache tidak ada dan sinyal terputus
+        if (!cachedKatalog) {
+            container.innerHTML = '<div class="job-empty">⚠️ Gagal memuat katalog dari Cloud. Pastikan koneksi stabil.</div>';
+        }
     }
 }
 
