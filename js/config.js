@@ -7,7 +7,7 @@
    ============================================ */
 
 // 1. APP CONFIGURATION
-const APP_VERSION = '3.0.6';
+const APP_VERSION = '3.0.7';
 const APP_NAME = 'PROJECT LANJUTAN';
 
 const AUTH_CONFIG = {
